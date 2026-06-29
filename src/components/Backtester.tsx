@@ -7,9 +7,16 @@ import MetricsGrid from "./MetricsGrid";
 import TradeTable from "./TradeTable";
 import type { BacktestRequest, BacktestResult } from "@/lib/types";
 
-// Charts touch the DOM, so load them client-side only.
-const PriceChart = dynamic(() => import("./PriceChart"), { ssr: false });
-const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
+// Charts touch the DOM, so load them client-side only. Reserve their height
+// while the chunk loads to avoid a layout reflow when results first appear.
+const PriceChart = dynamic(() => import("./PriceChart"), {
+  ssr: false,
+  loading: () => <div className="h-[420px] w-full animate-pulse rounded-lg bg-surface-2" />,
+});
+const EquityChart = dynamic(() => import("./EquityChart"), {
+  ssr: false,
+  loading: () => <div className="h-[260px] w-full animate-pulse rounded-lg bg-surface-2" />,
+});
 
 export default function Backtester() {
   const [result, setResult] = useState<BacktestResult | null>(null);
