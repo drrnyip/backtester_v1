@@ -60,13 +60,20 @@ async function massiveFetch(url: string): Promise<Record<string, unknown>> {
   throw new Error(lastErr || "Massive API request failed after retries.");
 }
 
-function recentWeekday(): string {
+// Massive's contract reference snapshots lag the live date by a couple of
+// trading days, so the most recent weekday often has no data yet. Generate a
+// list of recent business days (starting a few days back) and use the first
+// that returns contracts.
+function candidateAsOfDates(count = 6): string[] {
+  const dates: string[] = [];
   const d = new Date();
-  // Step back to the most recent weekday to get an active contract snapshot.
-  do {
+  d.setUTCDate(d.getUTCDate() - 2);
+  while (dates.length < count) {
+    const day = d.getUTCDay();
+    if (day !== 0 && day !== 6) dates.push(d.toISOString().slice(0, 10));
     d.setUTCDate(d.getUTCDate() - 1);
-  } while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
-  return d.toISOString().slice(0, 10);
+  }
+  return dates;
 }
 
 function addDays(date: string, days: number): string {
@@ -85,37 +92,42 @@ export async function listContracts(productCode: string): Promise<ContractInfo[]
   const cached = getCached<ContractInfo[]>(cacheKey);
   if (cached) return cached;
 
-  const params = new URLSearchParams({
-    product_code: code,
-    date: recentWeekday(),
-    limit: "1000",
-  });
-  const json = await massiveFetch(`${BASE_URL}/futures/v1/contracts?${params.toString()}`);
-  const results = (json.results as Record<string, unknown>[]) ?? [];
-  const byTicker = new Map<string, ContractInfo>();
-  for (const r of results) {
-    const ticker = r.ticker as string;
-    // Only outright single contracts (skip calendar-spread combos).
-    if (!ticker || byTicker.has(ticker)) continue;
-    if (r.type && r.type !== "single") continue;
-    if (ticker.includes("-")) continue;
-    byTicker.set(ticker, {
-      ticker,
-      productCode: (r.product_code as string) ?? code,
-      name: (r.name as string) ?? ticker,
-      active: Boolean(r.active),
-      firstTradeDate: (r.first_trade_date as string) ?? null,
-      lastTradeDate: (r.last_trade_date as string) ?? null,
-      settlementDate: (r.settlement_date as string) ?? null,
+  let list: ContractInfo[] = [];
+  for (const asOf of candidateAsOfDates()) {
+    const params = new URLSearchParams({
+      product_code: code,
+      date: asOf,
+      limit: "1000",
     });
+    const json = await massiveFetch(`${BASE_URL}/futures/v1/contracts?${params.toString()}`);
+    const results = (json.results as Record<string, unknown>[]) ?? [];
+    const byTicker = new Map<string, ContractInfo>();
+    for (const r of results) {
+      const ticker = r.ticker as string;
+      // Only outright single contracts (skip calendar-spread combos).
+      if (!ticker || byTicker.has(ticker)) continue;
+      if (r.type && r.type !== "single") continue;
+      if (ticker.includes("-")) continue;
+      byTicker.set(ticker, {
+        ticker,
+        productCode: (r.product_code as string) ?? code,
+        name: (r.name as string) ?? ticker,
+        active: Boolean(r.active),
+        firstTradeDate: (r.first_trade_date as string) ?? null,
+        lastTradeDate: (r.last_trade_date as string) ?? null,
+        settlementDate: (r.settlement_date as string) ?? null,
+      });
+    }
+    if (byTicker.size > 0) {
+      list = Array.from(byTicker.values()).sort((a, b) => {
+        const as = a.settlementDate ?? "";
+        const bs = b.settlementDate ?? "";
+        return as.localeCompare(bs);
+      });
+      break;
+    }
   }
-
-  const list = Array.from(byTicker.values()).sort((a, b) => {
-    const as = a.settlementDate ?? "";
-    const bs = b.settlementDate ?? "";
-    return as.localeCompare(bs);
-  });
-  setCached(cacheKey, list);
+  if (list.length > 0) setCached(cacheKey, list);
   return list;
 }
 
