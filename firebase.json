@@ -1,0 +1,24 @@
+{
+  "apphosting": [
+    {
+      "backendId": "backtester",
+      "rootDir": ".",
+      "ignore": [
+        "node_modules",
+        ".git",
+        ".next",
+        ".env",
+        ".env.local",
+        ".env*.local",
+        "firebase-debug.log",
+        "firebase-debug.*.log"
+      ]
+    }
+  ],
+  "emulators": {
+    "apphosting": {
+      "rootDirectory": ".",
+      "startCommand": "npm run dev"
+    }
+  }
+}

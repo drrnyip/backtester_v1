@@ -55,11 +55,24 @@ require a higher Massive plan and are not used here.
 
 ## Deploy (Firebase App Hosting)
 
-1. Connect this repository to a Firebase App Hosting backend.
+Project: `backtester-da4a5` (pinned in `.firebaserc`). Runtime config lives in
+`apphosting.yaml`; CLI deploy/emulator settings live in `firebase.json`.
+
+1. Create a Firebase App Hosting backend (Blaze plan). Either connect this repo to a
+   backend in the console, or run `firebase init apphosting`.
+   - `firebase.json` uses backend id **`backtester`** — rename it to match the backend you
+     create (or name your backend `backtester`).
 2. Create the runtime secrets:
    ```bash
    firebase apphosting:secrets:set MASSIVE_API_KEY
    firebase apphosting:secrets:set APP_PASSWORD
    firebase apphosting:secrets:set SESSION_SECRET
    ```
-3. Push to the connected branch. `apphosting.yaml` wires the secrets into the runtime.
+3. Deploy:
+   - **Git-connected:** push to the connected branch and App Hosting builds + rolls out
+     automatically, or
+   - **Local source:** `firebase deploy --only apphosting:backtester` (the working dir is
+     zipped; `.env*` is excluded via the `ignore` list so local secrets aren't uploaded).
+
+Local production-style testing: `firebase emulators:start` (App Hosting emulator runs
+`npm run dev`).
