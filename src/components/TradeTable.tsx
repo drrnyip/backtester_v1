@@ -30,7 +30,7 @@ export default function TradeTable({ trades }: { trades: Trade[] }) {
             <th className="px-3 py-2">Entry px</th>
             <th className="px-3 py-2">Exit (CT)</th>
             <th className="px-3 py-2">Exit px</th>
-            <th className="px-3 py-2">Bars</th>
+            <th className="px-3 py-2">Ticks</th>
             <th className="px-3 py-2">Reason</th>
             <th className="px-3 py-2 text-right">Net P&L</th>
           </tr>

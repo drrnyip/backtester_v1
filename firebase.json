@@ -18,7 +18,7 @@
   "emulators": {
     "apphosting": {
       "rootDirectory": ".",
-      "startCommand": "npm run dev"
+      "startCommand": "pnpm dev"
     }
   }
 }

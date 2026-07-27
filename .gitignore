@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local ES flat-file store (ingested tick data)
+/data/es/trades/
+/data/es/quotes/
+/data/es/sessions.json
+/data/es/.cache/

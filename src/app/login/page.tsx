@@ -40,10 +40,10 @@ export default function LoginPage() {
       >
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/15 text-accent">
-            <span className="text-xl font-bold">∿</span>
+            <span className="text-xl font-bold">ES</span>
           </div>
           <div>
-            <h1 className="text-lg font-bold">Futures Backtester</h1>
+            <h1 className="text-lg font-bold">ES Research</h1>
             <p className="text-xs text-muted">Enter the access password</p>
           </div>
         </div>

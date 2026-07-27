@@ -1,9 +1,8 @@
 # Firebase App Hosting configuration.
-# Secrets are stored in Cloud Secret Manager; create them with:
-#   firebase apphosting:secrets:set MASSIVE_API_KEY
+# Auth secrets (Cloud Secret Manager):
 #   firebase apphosting:secrets:set APP_PASSWORD
 #   firebase apphosting:secrets:set SESSION_SECRET
-# then grant access to the backend when prompted.
+# Tick data is local-first under data/es/ — not bundled into App Hosting.
 
 runConfig:
   cpu: 1
@@ -13,10 +12,6 @@ runConfig:
   concurrency: 80
 
 env:
-  - variable: MASSIVE_API_KEY
-    secret: MASSIVE_API_KEY
-    availability:
-      - RUNTIME
   - variable: APP_PASSWORD
     secret: APP_PASSWORD
     availability:

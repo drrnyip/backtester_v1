@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Futures Backtester",
-  description: "Research day-trading strategies on futures market data",
+  title: "ES Research",
+  description: "Research ES strategies on trade and quote flat-file data",
 };
 
 export default function RootLayout({

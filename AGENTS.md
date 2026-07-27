@@ -6,19 +6,20 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Cursor Cloud specific instructions
 
-Web-based futures backtesting platform: **Next.js 16 (App Router, TypeScript)** on **Firebase App Hosting**, market data from **Massive** (the rebranded Polygon.io). Single Next.js service; no separate backend. Scripts: `npm run dev` (port 3000), `npm run build`, `npm run lint`, `npm run typecheck`.
+ES trade/quote research platform: **Next.js 16 (App Router, TypeScript)** on **Firebase App Hosting** (UI optional). Market data from **Massive** CME **flat files** (trades + quotes), ingested locally under `data/es/`. Single Next.js service. Package manager: **pnpm**. Scripts: `pnpm dev` (port 3000), `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm ingest`, `pnpm seed-sample`.
 
-Environment variables (dev: put them in `.env.local`, which is gitignored; prod: Cloud Secret Manager via `apphosting.yaml`):
-- `MASSIVE_API_KEY` — server-only; read only in `src/lib/massive.ts`. Never expose to the client.
+Environment variables (dev: `.env.local`, gitignored; prod: Cloud Secret Manager via `apphosting.yaml` for auth only):
+- `MASSIVE_S3_ACCESS_KEY` / `MASSIVE_S3_SECRET_KEY` — Flat Files S3 credentials from the Massive dashboard (`files.massive.com`, bucket `flatfiles`). Required for `pnpm ingest`.
 - `APP_PASSWORD` — password for the access gate at `/login`.
 - `SESSION_SECRET` — value stored in the session cookie; the proxy compares against it.
+- `MASSIVE_API_KEY` — optional; not used by the tick research path.
 
-The app will not produce backtests without `MASSIVE_API_KEY` set; `/api/contracts` and `/api/backtest` return a clear error if it is missing.
+The app researches **ES only**. Without ingested sessions under `data/es/`, Explore/Backtest show an empty state — run `pnpm seed-sample` or `pnpm ingest -- --from YYYY-MM-DD --to YYYY-MM-DD`.
 
 Non-obvious caveats:
-- **Massive plan limits:** the configured key has aggregate bars (incl. 1-minute) + reference data, but **not** tick trades (`/futures/v1/trades` → `403 NOT_AUTHORIZED`) or real-time WebSockets. The backtester only uses `GET /futures/v1/aggs/{ticker}` at 1-minute resolution. Massive auth uses `Authorization: Bearer <key>`; base URL `https://api.massive.com`.
-- Massive returns bars **most-recent-first**; `getAggregates` re-sorts ascending for the engine (do not assume API order).
-- **Next 16 renamed middleware → `proxy`**: the auth gate lives in `src/proxy.ts` (not `middleware.ts`). Everything except `/login` and `/api/login` requires the session cookie.
+- **Plan requirement:** trades/quotes flat files need **Futures Developer+** (or Business CME). Aggregates-only keys get 403 on S3 prefixes `futures/trades/cme` and `futures/quotes/cme`.
+- **Front-month rule:** for each session date, keep outright ES tickers matching `^ES[FGHJKMNQUVXZ][0-9]{1,2}$`, pick highest trade count.
+- **Local-first data:** parquet day files in `data/es/` are gitignored. Firebase App Hosting is ephemeral — do not rely on it for multi-GB tick storage without external object storage.
+- **Next 16 renamed middleware → `proxy`**: auth gate lives in `src/proxy.ts`. Everything except `/login` and `/api/login` requires the session cookie.
 - Next 16 enables **React Compiler lint rules**: avoid manual `useCallback`/`useMemo` that the compiler can't preserve, and avoid synchronous `setState` in `useEffect` bodies (move into handlers/async callbacks).
-- Pick a contract whose history covers the chosen date range. Far-dated contracts (settlement years out) have no 1-minute history yet and will return "No bars". 1-minute date range is capped at 45 days server-side.
-- Deploy: Firebase App Hosting builds from the connected repo using `apphosting.yaml`; create the three secrets with `firebase apphosting:secrets:set <NAME>` before the first rollout.
+- Deploy: Firebase App Hosting builds from the connected repo using `apphosting.yaml`; create auth secrets with `firebase apphosting:secrets:set <NAME>` before rollout.

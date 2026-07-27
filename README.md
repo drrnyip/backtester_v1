@@ -1,78 +1,74 @@
-# Futures Backtester
+# ES Trade & Quote Research Platform
 
-A web-based platform for researching **intraday (day-trading) futures strategies** on
-1-minute historical data. Built with **Next.js 16** (App Router) and deployed on
-**Firebase App Hosting**. Market data comes from the [Massive](https://massive.com) API
-(the rebranded Polygon.io).
+Local-first web app for researching **E-mini S&P 500 (ES)** strategies on
+**trade and quote** tick data from [Massive](https://massive.com) CME flat files.
+Built with **Next.js 16** (App Router) and optionally deployed on Firebase App Hosting
+(UI shell only — tick archives stay on disk).
 
 ## Features
 
-- **Preset strategies with parameters:** SMA Crossover, RSI Mean Reversion, Opening Range
-  Breakout, and Bollinger Bands (mean-reversion / breakout).
-- **Realistic execution model:** market / limit / stop entries, configurable slippage and
-  per-contract commissions, optional stop-loss / take-profit, and end-of-session flattening
-  for intraday testing.
-- **Futures-aware accounting:** contract multiplier and tick value per product.
-- **Results dashboard:** candlestick chart with trade markers, equity curve, a full trade
-  log, and performance metrics (net P&L, return, max drawdown, profit factor, win rate,
-  Sharpe, and more).
+- **Flat-file ingest:** download Massive CME trades/quotes, filter to ES outrights,
+  pick front-month by trade count, store day parquet under `data/es/`.
+- **Explore:** session picker, OHLC from trades, mid/spread from quotes, session
+  stats, mid-session tape sample.
+- **Backtest:** tick engine with as-of BBO; starter strategies — opening range
+  breakout, spread widen fade, trade imbalance.
 - **Simple access gate** suited to an internal tool.
+
+## Prerequisite
+
+Massive **Futures Developer+** (or Business CME) for flat files, plus S3 credentials
+from the Massive dashboard (`files.massive.com`). Aggregates-only API keys cannot
+ingest trades/quotes.
 
 ## Getting started
 
-Requires Node.js 20+.
+Requires Node.js 20+ and [pnpm](https://pnpm.io).
 
 ```bash
-npm install
+pnpm install
 
 # Create .env.local (gitignored):
 cat > .env.local <<'EOF'
-MASSIVE_API_KEY=your_massive_api_key
+MASSIVE_S3_ACCESS_KEY=your_s3_access_key
+MASSIVE_S3_SECRET_KEY=your_s3_secret_key
 APP_PASSWORD=choose-a-password
 SESSION_SECRET=any-random-string
 EOF
 
-npm run dev      # http://localhost:3000
+# Demo data without Massive (synthetic ES session):
+pnpm seed-sample
+
+# Or ingest real flat files for a date range:
+pnpm ingest -- --from 2024-12-16 --to 2024-12-17
+
+pnpm dev      # http://localhost:3000
 ```
 
-Other scripts: `npm run build`, `npm run lint`, `npm run typecheck`.
+Other scripts: `pnpm build`, `pnpm lint`, `pnpm typecheck`.
 
 ## Architecture
 
 | Piece | Location | Notes |
 | --- | --- | --- |
-| Massive data client | `src/lib/massive.ts` | Server-only; fetches contracts + 1-min OHLC bars |
-| Backtest engine | `src/lib/backtest/` | `engine.ts`, `strategies.ts`, `indicators.ts`, `metrics.ts` |
-| API routes | `src/app/api/*` | `contracts`, `backtest`, `login`, `logout` |
+| Ingest CLI | `scripts/ingest-es.ts` | S3 → filter ES → parquet + `sessions.json` |
+| Sample seed | `scripts/seed-sample.ts` | Synthetic session for UI without S3 |
+| Local data | `data/es/` | Gitignored trades/quotes parquet |
+| Session reader | `src/lib/data/` | Load, resample, stats, tape windows |
+| Tick engine | `src/lib/backtest/` | Trade events + as-of quotes |
+| API | `src/app/api/sessions`, `backtest` | List/overview/tape + strategy run |
 | Auth gate | `src/proxy.ts` | Next 16 renamed middleware → proxy |
-| UI | `src/components/*` | Config panel, charts (lightweight-charts), metrics, trade log |
-
-## Data tier note
-
-The backtester uses aggregate OHLC bars at 1-minute resolution
-(`GET /futures/v1/aggs/{ticker}`). Tick-level trades and real-time WebSocket streams
-require a higher Massive plan and are not used here.
+| UI | `src/components/ResearchApp.tsx` | Explore + Backtest tabs |
 
 ## Deploy (Firebase App Hosting)
 
 Project: `backtester-da4a5` (pinned in `.firebaserc`). Runtime config lives in
-`apphosting.yaml`; CLI deploy/emulator settings live in `firebase.json`.
+`apphosting.yaml`. Tick data is **local-first** — App Hosting is fine for the UI
+gate, not for multi-GB flat-file archives without external object storage.
 
-1. Create a Firebase App Hosting backend (Blaze plan). Either connect this repo to a
-   backend in the console, or run `firebase init apphosting`.
-   - `firebase.json` uses backend id **`backtester`** — rename it to match the backend you
-     create (or name your backend `backtester`).
-2. Create the runtime secrets:
+1. Create secrets:
    ```bash
-   firebase apphosting:secrets:set MASSIVE_API_KEY
    firebase apphosting:secrets:set APP_PASSWORD
    firebase apphosting:secrets:set SESSION_SECRET
    ```
-3. Deploy:
-   - **Git-connected:** push to the connected branch and App Hosting builds + rolls out
-     automatically, or
-   - **Local source:** `firebase deploy --only apphosting:backtester` (the working dir is
-     zipped; `.env*` is excluded via the `ignore` list so local secrets aren't uploaded).
-
-Local production-style testing: `firebase emulators:start` (App Hosting emulator runs
-`npm run dev`).
+2. Deploy via git-connected backend or `firebase deploy --only apphosting:backtester`.
